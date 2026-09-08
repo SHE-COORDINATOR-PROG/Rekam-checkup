@@ -1,10 +1,15 @@
 -- Jalankan file ini sekali di Neon SQL Editor (Neon Console > SQL Editor)
--- untuk membuat tabel yang dipakai aplikasi.
+-- untuk membuat tabel yang dipakai aplikasi (instalasi baru). Untuk database
+-- yang sudah terlanjur dibuat dari versi sebelumnya, JANGAN jalankan file ini
+-- lagi -- pakai migration_2_status_validity.sql saja.
 
 create table if not exists checkups (
   id text primary key,
   date date not null,
   source text,
+  status text not null default 'fit',              -- fit | fit_catatan | tidak_fit_sementara | tidak_fit
+  validity_months integer not null default 12,      -- masa berlaku checkup dalam bulan
+  expiry_date date,                                 -- tanggal checkup berikutnya jatuh tempo
   created_at timestamptz not null default now()
 );
 

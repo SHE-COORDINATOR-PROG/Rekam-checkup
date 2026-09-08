@@ -73,17 +73,35 @@ export function computeStatus(row: {
   return "normal";
 }
 
+/** Format ringkas untuk daftar follow-up, mis. "135 mg/dL · rujukan 70–100". Label Tinggi/Rendah sudah diwakili pill terpisah di UI, jadi tidak diulang di sini. */
 export function followUpNote(
   row: { name: string; value: number; unit: string; rangeLow: number | null; rangeHigh: number | null },
   status: Status
 ): string {
   if (status === "normal") return "";
-  const rangeTxt =
-    row.rangeLow != null && row.rangeHigh != null
-      ? `normal: ${row.rangeLow}–${row.rangeHigh} ${row.unit || ""}`.trim()
-      : "";
-  const arah = status === "high" ? "di atas" : "di bawah";
-  return `Hasil ${row.name} (${row.value}${row.unit ? " " + row.unit : ""}) berada ${arah} rentang normal${
-    rangeTxt ? " (" + rangeTxt + ")" : ""
-  }. Sebaiknya didiskusikan dengan dokter.`;
+  const rangeTxt = row.rangeLow != null && row.rangeHigh != null ? `rujukan ${row.rangeLow}–${row.rangeHigh}` : "";
+  const valTxt = `${row.value}${row.unit ? " " + row.unit : ""}`;
+  return `${valTxt}${rangeTxt ? " · " + rangeTxt : ""}`;
+}
+
+/** Menyarankan status kelayakan berdasarkan jumlah dan tingkat hasil abnormal. Tetap bisa diubah manual oleh pengguna. */
+export function suggestFitStatus(rows: Array<{ status: Status }>): "fit" | "fit_catatan" {
+  const abnormalCount = rows.filter((r) => r.status !== "normal").length;
+  if (abnormalCount === 0) return "fit";
+  return "fit_catatan";
+}
+
+/** Menambah sejumlah bulan ke tanggal ISO (yyyy-mm-dd), dipakai untuk menghitung masa berlaku checkup. */
+export function addMonthsIso(dateIso: string, months: number): string {
+  const d = new Date(dateIso + "T00:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Sisa hari sampai tanggal kadaluarsa (negatif berarti sudah lewat). */
+export function daysUntil(dateIso: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateIso + "T00:00:00");
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
 }

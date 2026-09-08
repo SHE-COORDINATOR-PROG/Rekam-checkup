@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Checkup, DraftRow } from "@/lib/types";
+import type { Checkup, DraftRow, FitStatus } from "@/lib/types";
 import { parseLines, guessDate } from "@/lib/parse";
 import { extractPdfLines } from "@/lib/pdf-extract";
 import Timeline from "./Timeline";
 import AlertPanel from "./AlertPanel";
 import DetailPanel from "./DetailPanel";
 import UploadReviewModal from "./UploadReviewModal";
+import StatusSummary from "./StatusSummary";
 
 export default function Dashboard() {
   const [checkups, setCheckups] = useState<Checkup[]>([]);
@@ -83,7 +84,7 @@ export default function Dashboard() {
     }
   }
 
-  async function handleSaveCheckup(date: string, rows: DraftRow[]) {
+  async function handleSaveCheckup(date: string, status: FitStatus, validityMonths: number, rows: DraftRow[]) {
     setSaving(true);
     setError("");
     try {
@@ -92,6 +93,8 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date,
+          status,
+          validityMonths,
           source: modal?.source || "",
           results: rows.map((r) => ({
             name: r.name,
@@ -161,13 +164,16 @@ export default function Dashboard() {
       {loading ? (
         <div className="empty-state">Memuat...</div>
       ) : (
-        <div className="layout">
-          <Timeline checkups={checkups} selectedId={selectedId} onSelect={setSelectedId} />
-          <div>
-            <AlertPanel checkups={checkups} onResolve={handleResolve} />
-            <DetailPanel checkups={checkups} selectedId={selectedId} />
+        <>
+          <StatusSummary checkups={checkups} />
+          <div className="layout">
+            <Timeline checkups={checkups} selectedId={selectedId} onSelect={setSelectedId} />
+            <div>
+              <AlertPanel checkups={checkups} onResolve={handleResolve} />
+              <DetailPanel checkups={checkups} selectedId={selectedId} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       <div className="disclaimer">

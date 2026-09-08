@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@/lib/db";
-import { computeStatus, followUpNote } from "@/lib/parse";
-import type { Checkup, ResultRow } from "@/lib/types";
+import { computeStatus, followUpNote, addMonthsIso } from "@/lib/parse";
+import type { Checkup, FitStatus, ResultRow } from "@/lib/types";
 
 export const runtime = "edge";
 
@@ -9,7 +9,8 @@ export async function GET() {
   try {
     const sql = getSql();
     const checkupRows = await sql`
-      select id, to_char(date, 'YYYY-MM-DD') as date, source
+      select id, to_char(date, 'YYYY-MM-DD') as date, source, status,
+             validity_months, to_char(expiry_date, 'YYYY-MM-DD') as expiry_date
       from checkups
       order by date desc, created_at desc
     `;
@@ -40,6 +41,9 @@ export async function GET() {
       id: c.id,
       date: c.date,
       source: c.source || "",
+      status: (c.status || "fit") as FitStatus,
+      validityMonths: c.validity_months ?? 12,
+      expiryDate: c.expiry_date || addMonthsIso(c.date, c.validity_months ?? 12),
       results: byCheckup[c.id] || [],
     }));
 
@@ -54,6 +58,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const date: string = body.date;
     const source: string = body.source || "";
+    const status: FitStatus = body.status || "fit";
+    const validityMonths: number = Number(body.validityMonths) || 12;
     const rows: Array<{
       name: string;
       value: number;
@@ -67,18 +73,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tanggal dan minimal satu hasil pemeriksaan wajib diisi." }, { status: 400 });
     }
 
+    const expiryDate = addMonthsIso(date, validityMonths);
     const sql = getSql();
     const checkupId = crypto.randomUUID();
-    await sql`insert into checkups (id, date, source) values (${checkupId}, ${date}, ${source})`;
+    await sql`
+      insert into checkups (id, date, source, status, validity_months, expiry_date)
+      values (${checkupId}, ${date}, ${source}, ${status}, ${validityMonths}, ${expiryDate})
+    `;
 
     for (const row of rows) {
       if (!row.name || row.value === null || row.value === undefined) continue;
-      const status = computeStatus(row);
-      const note = followUpNote(row, status);
+      const rowStatus = computeStatus(row);
+      const note = followUpNote(row, rowStatus);
       const resultId = crypto.randomUUID();
       await sql`
         insert into results (id, checkup_id, name, value, unit, range_low, range_high, status, note, resolved)
-        values (${resultId}, ${checkupId}, ${row.name}, ${row.value}, ${row.unit || ""}, ${row.rangeLow}, ${row.rangeHigh}, ${status}, ${note}, false)
+        values (${resultId}, ${checkupId}, ${row.name}, ${row.value}, ${row.unit || ""}, ${row.rangeLow}, ${row.rangeHigh}, ${rowStatus}, ${note}, false)
       `;
     }
 

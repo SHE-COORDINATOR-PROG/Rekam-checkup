@@ -1,9 +1,16 @@
 "use client";
 
 import type { Checkup } from "@/lib/types";
+import { FIT_STATUS_LABEL } from "@/lib/types";
 import { formatDate } from "./Timeline";
 
 const statusLabel: Record<string, string> = { normal: "Normal", high: "Tinggi", low: "Rendah" };
+const FIT_CLASS: Record<string, string> = {
+  fit: "fit",
+  fit_catatan: "fit-catatan",
+  tidak_fit_sementara: "tidak-fit-sementara",
+  tidak_fit: "tidak-fit",
+};
 
 export default function DetailPanel({ checkups, selectedId }: { checkups: Checkup[]; selectedId: string | null }) {
   if (!selectedId) {
@@ -33,7 +40,10 @@ export default function DetailPanel({ checkups, selectedId }: { checkups: Checku
   return (
     <div className="panel">
       <h2>{formatDate(rec.date)}</h2>
-      <p className="sub">{rec.source}</p>
+      <p className="sub">
+        {rec.source} · <span className={`status-badge ${FIT_CLASS[rec.status]}`}>{FIT_STATUS_LABEL[rec.status]}</span>{" "}
+        · berlaku sampai {formatDate(rec.expiryDate)}
+      </p>
       <table>
         <thead>
           <tr>
