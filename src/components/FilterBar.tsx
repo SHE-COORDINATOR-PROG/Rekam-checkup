@@ -1,18 +1,18 @@
 "use client";
 
-import type { FitStatus } from "@/lib/types";
-import { FIT_STATUS_LABEL } from "@/lib/types";
+import type { RiskTier } from "@/lib/types";
+import { RISK_TIER_BOX_LABEL } from "@/lib/types";
 
 type Props = {
   from: string;
   to: string;
-  status: FitStatus | "all";
+  kkrLevel: RiskTier | "all";
   onFromChange: (v: string) => void;
   onToChange: (v: string) => void;
-  onStatusChange: (v: FitStatus | "all") => void;
+  onKkrLevelChange: (v: RiskTier | "all") => void;
 };
 
-export default function FilterBar({ from, to, status, onFromChange, onToChange, onStatusChange }: Props) {
+export default function FilterBar({ from, to, kkrLevel, onFromChange, onToChange, onKkrLevelChange }: Props) {
   return (
     <div className="filter-bar">
       <div className="filter-field">
@@ -24,23 +24,23 @@ export default function FilterBar({ from, to, status, onFromChange, onToChange, 
         <input type="date" value={to} onChange={(e) => onToChange(e.target.value)} />
       </div>
       <div className="filter-field">
-        <label>Status kelayakan</label>
-        <select value={status} onChange={(e) => onStatusChange(e.target.value as FitStatus | "all")}>
-          <option value="all">Semua status</option>
-          {(Object.keys(FIT_STATUS_LABEL) as FitStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {FIT_STATUS_LABEL[s]}
+        <label>Level KKR</label>
+        <select value={kkrLevel} onChange={(e) => onKkrLevelChange(e.target.value as RiskTier | "all")}>
+          <option value="all">Semua level</option>
+          {(Object.keys(RISK_TIER_BOX_LABEL) as RiskTier[]).map((t) => (
+            <option key={t} value={t}>
+              {RISK_TIER_BOX_LABEL[t]}
             </option>
           ))}
         </select>
       </div>
-      {(from || to || status !== "all") && (
+      {(from || to || kkrLevel !== "all") && (
         <button
           className="filter-clear"
           onClick={() => {
             onFromChange("");
             onToChange("");
-            onStatusChange("all");
+            onKkrLevelChange("all");
           }}
         >
           Reset filter

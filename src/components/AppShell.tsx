@@ -3,9 +3,10 @@
 import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import type { DraftRow, FitStatus } from "@/lib/types";
-import { parseLines, guessDate } from "@/lib/parse";
+import type { DraftRow, PatientInfo } from "@/lib/types";
+import { parseLines, extractPatientInfo } from "@/lib/parse";
 import { extractPdfLines } from "@/lib/pdf-extract";
+import type { SaveCheckupInput } from "@/lib/useCheckups";
 import UploadReviewModal from "./UploadReviewModal";
 
 type Props = {
@@ -14,13 +15,7 @@ type Props = {
   lastUpdated: Date | null;
   onRefresh: () => void;
   onSaved: (newCheckupId: string) => void;
-  saveCheckup: (
-    date: string,
-    status: FitStatus,
-    validityMonths: number,
-    source: string,
-    rows: DraftRow[]
-  ) => Promise<string>;
+  saveCheckup: (input: SaveCheckupInput) => Promise<string>;
   children: React.ReactNode;
 };
 
@@ -31,9 +26,12 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [modal, setModal] = useState<{ rows: DraftRow[]; date: string; source: string; parseNote: string } | null>(
-    null
-  );
+  const [modal, setModal] = useState<{
+    rows: DraftRow[];
+    patientInfo: PatientInfo;
+    source: string;
+    parseNote: string;
+  } | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -43,20 +41,20 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
     try {
       const lines = await extractPdfLines(file);
       const rows = parseLines(lines);
-      const date = guessDate(lines);
+      const patientInfo = extractPatientInfo(lines);
       setModal({
         rows,
-        date,
+        patientInfo,
         source: file.name,
         parseNote:
           rows.length > 0
-            ? `${rows.length} baris hasil terdeteksi otomatis. Periksa nilai dan rentang normal di bawah sebelum menyimpan.`
+            ? `${rows.length} baris hasil terdeteksi otomatis. Periksa nilai, rujukan, dan data pasien di bawah sebelum menyimpan — baris kualitatif (Positif/Negatif) paling sering butuh koreksi.`
             : `Tidak ada baris yang terbaca otomatis dari file ini. Tambahkan hasil secara manual di bawah.`,
       });
     } catch {
       setModal({
         rows: [],
-        date: new Date().toISOString().slice(0, 10),
+        patientInfo: { patientName: "", employeeId: "", position: "", department: "", company: "", date: new Date().toISOString().slice(0, 10) },
         source: file.name,
         parseNote: `Gagal membaca PDF ini secara otomatis. Tambahkan hasil secara manual di bawah.`,
       });
@@ -66,11 +64,11 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
     }
   }
 
-  async function handleSave(date: string, status: FitStatus, validityMonths: number, rows: DraftRow[]) {
+  async function handleSave(input: Omit<SaveCheckupInput, "source">) {
     setSaving(true);
     setUploadError("");
     try {
-      const id = await saveCheckup(date, status, validityMonths, modal?.source || "", rows);
+      const id = await saveCheckup({ ...input, source: modal?.source || "" });
       setModal(null);
       onSaved(id);
     } catch (e: any) {
@@ -115,8 +113,8 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
           />
         </nav>
         <div className="sidebar-footer">
-          Acuan kategori kelayakan: pola umum MCU kesehatan kerja Indonesia (mis. Permenaker No. 02/Men/1980).
-          Bukan alat diagnosis — hasil abnormal tetap perlu dikonfirmasi dokter.
+          Level KKR (Rendah/Sedang/Berat) adalah perkiraan otomatis berdasarkan hasil pemeriksaan, mengikuti format
+          laporan klinik — bukan alat diagnosis. Selalu rujuk kesimpulan resmi dari dokter/klinik.
         </div>
       </aside>
 
@@ -142,16 +140,16 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
         {children}
 
         <div className="disclaimer">
-          Aplikasi ini membantu memantau dan merangkum hasil checkup secara pribadi — bukan alat diagnosis. Ekstraksi
-          otomatis dari PDF bisa saja salah baca, jadi selalu periksa ulang hasil sebelum disimpan. Untuk hasil yang
-          ditandai perlu ditindaklanjuti, konsultasikan dengan dokter atau tenaga medis.
+          Aplikasi ini membantu memantau dan merangkum hasil checkup — bukan alat diagnosis. Ekstraksi otomatis dari
+          PDF bisa saja salah baca, jadi selalu periksa ulang hasil sebelum disimpan. Untuk hasil yang ditandai
+          perlu ditindaklanjuti, konsultasikan dengan dokter atau tenaga medis.
         </div>
       </main>
 
       {modal && (
         <UploadReviewModal
           initialRows={modal.rows}
-          initialDate={modal.date}
+          initialPatientInfo={modal.patientInfo}
           source={modal.source}
           parseNote={modal.parseNote}
           saving={saving}

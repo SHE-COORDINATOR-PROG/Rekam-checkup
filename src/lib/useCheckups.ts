@@ -1,7 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Checkup, DraftRow, FitStatus } from "./types";
+import type { Checkup, DraftRow, RiskTier } from "./types";
+
+export type SaveCheckupInput = {
+  date: string;
+  source: string;
+  patientName: string;
+  employeeId: string;
+  position: string;
+  department: string;
+  company: string;
+  kkrLevel: RiskTier;
+  validityMonths: number;
+  rows: DraftRow[];
+};
 
 export function useCheckups() {
   const [checkups, setCheckups] = useState<Checkup[]>([]);
@@ -30,28 +43,29 @@ export function useCheckups() {
     fetchCheckups();
   }, [fetchCheckups]);
 
-  async function saveCheckup(
-    date: string,
-    status: FitStatus,
-    validityMonths: number,
-    source: string,
-    rows: DraftRow[]
-  ) {
+  async function saveCheckup(input: SaveCheckupInput) {
     const res = await fetch("/api/checkups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        date,
-        status,
-        validityMonths,
-        source,
-        results: rows.map((r) => ({
+        date: input.date,
+        source: input.source,
+        patientName: input.patientName,
+        employeeId: input.employeeId,
+        position: input.position,
+        department: input.department,
+        company: input.company,
+        kkrLevel: input.kkrLevel,
+        validityMonths: input.validityMonths,
+        results: input.rows.map((r) => ({
+          category: r.category,
           name: r.name,
           value: r.value,
+          valueText: r.valueText,
           unit: r.unit,
           rangeLow: r.rangeLow,
           rangeHigh: r.rangeHigh,
-          flagRaw: r.flagRaw,
+          rangeText: r.rangeText,
         })),
       }),
     });

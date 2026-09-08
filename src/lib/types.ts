@@ -1,45 +1,70 @@
-export type Status = "normal" | "high" | "low";
+// Tingkat risiko per indikator maupun kesimpulan keseluruhan checkup, mengikuti
+// format "Level KKR" (Kelompok Kesehatan Resiko) yang dipakai laporan klinik.
+export type RiskTier = "rendah" | "sedang" | "berat";
+
+// Label untuk pill per-hasil pemeriksaan (sesuai instruksi: normal/sedang/berat).
+export const RISK_TIER_RESULT_LABEL: Record<RiskTier, string> = {
+  rendah: "Normal",
+  sedang: "Sedang",
+  berat: "Berat",
+};
+
+// Label untuk kotak ringkasan jumlah indikator (meniru teks asli laporan klinik).
+export const RISK_TIER_BOX_LABEL: Record<RiskTier, string> = {
+  rendah: "RENDAH",
+  sedang: "SEDANG",
+  berat: "BERAT",
+};
 
 export type ResultRow = {
   id: string;
+  category: string; // mis. "Hematologi - Jumlah Sel Darah"
   name: string;
-  value: number;
+  value: number | null; // null untuk hasil kualitatif
+  valueText: string; // teks hasil apa adanya, mis. "16.4" atau "Positif 3"
   unit: string;
   rangeLow: number | null;
   rangeHigh: number | null;
-  status: Status;
+  rangeText: string; // rujukan kualitatif apa adanya, mis. "Negatif"
+  riskTier: RiskTier;
   note: string;
   resolved: boolean;
 };
 
-// Status kelayakan hasil medical checkup (kategori umum MCU kesehatan kerja
-// di Indonesia): fit, fit dengan catatan, tidak fit sementara, tidak fit.
-export type FitStatus = "fit" | "fit_catatan" | "tidak_fit_sementara" | "tidak_fit";
-
-export const FIT_STATUS_LABEL: Record<FitStatus, string> = {
-  fit: "Fit / Sehat",
-  fit_catatan: "Fit dengan Catatan",
-  tidak_fit_sementara: "Tidak Fit Sementara",
-  tidak_fit: "Tidak Fit",
-};
-
 export type Checkup = {
   id: string;
-  date: string; // ISO yyyy-mm-dd
+  date: string; // ISO yyyy-mm-dd, tanggal MCU
   source: string;
-  status: FitStatus;
+  patientName: string;
+  employeeId: string; // No. Lab / NRP
+  position: string; // Jabatan
+  department: string; // Departemen
+  company: string; // Perusahaan
+  kkrLevel: RiskTier;
   validityMonths: number;
-  expiryDate: string; // ISO yyyy-mm-dd, tanggal checkup berikutnya jatuh tempo
+  expiryDate: string; // ISO yyyy-mm-dd
   results: ResultRow[];
 };
 
 // Baris mentah hasil parsing PDF, sebelum di-review dan disimpan.
 export type DraftRow = {
   id: string;
+  category: string;
   name: string;
   value: number | null;
+  valueText: string;
   unit: string;
   rangeLow: number | null;
   rangeHigh: number | null;
-  flagRaw: string; // "", "H", "L"
+  rangeText: string;
+  flagRaw: string; // "", "+", "*" - penanda dari kolom FLAG di laporan asli
+};
+
+export type PatientInfo = {
+  patientName: string;
+  employeeId: string;
+  position: string;
+  department: string;
+  company: string;
+  date: string; // tebakan tanggal MCU, ISO yyyy-mm-dd
 };

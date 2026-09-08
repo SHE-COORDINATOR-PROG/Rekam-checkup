@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCheckups } from "@/lib/useCheckups";
+import { filterCheckups } from "@/lib/stats";
 import AppShell from "@/components/AppShell";
-import StatusSummary from "@/components/StatusSummary";
 import Timeline from "@/components/Timeline";
 import AlertPanel from "@/components/AlertPanel";
 import DetailPanel from "@/components/DetailPanel";
@@ -11,8 +11,10 @@ import DetailPanel from "@/components/DetailPanel";
 export default function RiwayatPage() {
   const { checkups, loading, lastUpdated, fetchCheckups, saveCheckup, resolveItem } = useCheckups();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  const currentSelected = selectedId ?? checkups[0]?.id ?? null;
+  const filtered = useMemo(() => filterCheckups(checkups, { name: search }), [checkups, search]);
+  const currentSelected = filtered.some((c) => c.id === selectedId) ? selectedId : filtered[0]?.id ?? null;
 
   async function handleSaved(newId: string) {
     await fetchCheckups();
@@ -32,12 +34,18 @@ export default function RiwayatPage() {
         <div className="empty-state">Memuat...</div>
       ) : (
         <>
-          <StatusSummary checkups={checkups} />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Cari nama pasien/karyawan..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <div className="layout">
-            <Timeline checkups={checkups} selectedId={currentSelected} onSelect={setSelectedId} />
+            <Timeline checkups={filtered} selectedId={currentSelected} onSelect={setSelectedId} />
             <div>
-              <AlertPanel checkups={checkups} onResolve={resolveItem} />
-              <DetailPanel checkups={checkups} selectedId={currentSelected} />
+              <AlertPanel checkups={filtered} onResolve={resolveItem} />
+              <DetailPanel checkups={filtered} selectedId={currentSelected} />
             </div>
           </div>
         </>

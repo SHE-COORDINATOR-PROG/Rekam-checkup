@@ -1,52 +1,55 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DraftRow, FitStatus } from "@/lib/types";
-import { FIT_STATUS_LABEL } from "@/lib/types";
-import { computeStatus, suggestFitStatus } from "@/lib/parse";
+import type { DraftRow, PatientInfo, RiskTier } from "@/lib/types";
+import { RISK_TIER_BOX_LABEL } from "@/lib/types";
+import { computeRiskTier, parseRangeText, suggestKkrLevel, toNum } from "@/lib/parse";
+import type { SaveCheckupInput } from "@/lib/useCheckups";
 
 type Props = {
   initialRows: DraftRow[];
-  initialDate: string;
+  initialPatientInfo: PatientInfo;
   source: string;
   parseNote: string;
   saving: boolean;
   onCancel: () => void;
-  onSave: (date: string, status: FitStatus, validityMonths: number, rows: DraftRow[]) => void;
+  onSave: (input: Omit<SaveCheckupInput, "source">) => void;
 };
 
 export default function UploadReviewModal({
   initialRows,
-  initialDate,
+  initialPatientInfo,
   source,
   parseNote,
   saving,
   onCancel,
   onSave,
 }: Props) {
-  const [date, setDate] = useState(initialDate);
+  const [date, setDate] = useState(initialPatientInfo.date);
+  const [patientName, setPatientName] = useState(initialPatientInfo.patientName);
+  const [employeeId, setEmployeeId] = useState(initialPatientInfo.employeeId);
+  const [position, setPosition] = useState(initialPatientInfo.position);
+  const [department, setDepartment] = useState(initialPatientInfo.department);
+  const [company, setCompany] = useState(initialPatientInfo.company);
   const [rows, setRows] = useState<DraftRow[]>(initialRows);
   const [validityMonths, setValidityMonths] = useState(12);
+  const [kkrOverride, setKkrOverride] = useState<RiskTier | null>(null);
 
   const computedRows = useMemo(
-    () => rows.filter((r) => r.value !== null).map((r) => ({ ...r, status: computeStatus({ ...r, value: r.value as number }) })),
+    () =>
+      rows.map((r) => {
+        const { rangeLow, rangeHigh } = r.rangeText ? parseRangeText(r.rangeText) : { rangeLow: r.rangeLow, rangeHigh: r.rangeHigh };
+        const value = r.valueText ? toNum(r.valueText) : r.value;
+        const riskTier = computeRiskTier({ value, rangeLow, rangeHigh, valueText: r.valueText, rangeText: r.rangeText });
+        return { ...r, value, rangeLow, rangeHigh, riskTier };
+      }),
     [rows]
   );
-  const [statusOverride, setStatusOverride] = useState<FitStatus | null>(null);
-  const suggestedStatus = suggestFitStatus(computedRows);
-  const status = statusOverride ?? suggestedStatus;
+  const suggestedKkr = suggestKkrLevel(computedRows);
+  const kkrLevel = kkrOverride ?? suggestedKkr;
 
   function updateRow(id: string, field: keyof DraftRow, value: string) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        if (field === "value" || field === "rangeLow" || field === "rangeHigh") {
-          const n = value === "" ? null : parseFloat(value.replace(",", "."));
-          return { ...r, [field]: isNaN(n as number) ? null : n };
-        }
-        return { ...r, [field]: value };
-      })
-    );
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   }
 
   function removeRow(id: string) {
@@ -56,52 +59,72 @@ export default function UploadReviewModal({
   function addRow() {
     setRows((prev) => [
       ...prev,
-      { id: "new" + Date.now(), name: "", value: 0, unit: "", rangeLow: null, rangeHigh: null, flagRaw: "" },
+      { id: "new" + Date.now(), category: "", name: "", value: null, valueText: "", unit: "", rangeLow: null, rangeHigh: null, rangeText: "", flagRaw: "" },
     ]);
   }
 
   function handleSave() {
-    const cleaned = rows.filter((r) => r.name.trim().length > 0 && r.value !== null);
+    const cleaned = computedRows.filter((r) => r.name.trim().length > 0 && r.valueText.trim().length > 0);
     if (cleaned.length === 0) {
       alert("Tambahkan minimal satu hasil pemeriksaan.");
       return;
     }
-    onSave(date, status, validityMonths, cleaned);
+    if (!patientName.trim()) {
+      alert("Nama pasien/karyawan wajib diisi.");
+      return;
+    }
+    onSave({ date, patientName, employeeId, position, department, company, kkrLevel, validityMonths, rows: cleaned });
   }
 
   return (
     <div className="overlay">
-      <div className="modal">
+      <div className="modal modal-wide">
         <h2>Tinjau hasil ekstraksi</h2>
-        <p className="sub">Periksa dan perbaiki data sebelum disimpan — pembacaan otomatis dari PDF tidak selalu sempurna.</p>
+        <p className="sub">Periksa dan perbaiki data sebelum disimpan — pembacaan otomatis dari PDF tidak selalu sempurna, terutama baris kualitatif (Positif/Negatif).</p>
         <div className="parse-note">{parseNote}</div>
 
         <div className="field-row">
           <div className="field">
-            <label>Tanggal checkup</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <label>Nama pasien / karyawan</label>
+            <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Wajib diisi" />
           </div>
           <div className="field">
-            <label>Status kelayakan</label>
-            <select
-              value={status}
-              onChange={(e) => setStatusOverride(e.target.value as FitStatus)}
-              style={{ padding: "7px 9px", borderRadius: 3, border: "1px solid var(--border-strong)", fontFamily: "inherit", fontSize: 13.5 }}
-            >
-              {(Object.keys(FIT_STATUS_LABEL) as FitStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {FIT_STATUS_LABEL[s]}
+            <label>No. Lab / NRP</label>
+            <input type="text" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Tanggal MCU</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Jabatan</label>
+            <input type="text" value={position} onChange={(e) => setPosition(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Departemen</label>
+            <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 1, minWidth: 160 }}>
+            <label>Perusahaan</label>
+            <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} />
+          </div>
+        </div>
+        <div className="field-row">
+          <div className="field">
+            <label>Level KKR</label>
+            <select value={kkrLevel} onChange={(e) => setKkrOverride(e.target.value as RiskTier)}>
+              {(Object.keys(RISK_TIER_BOX_LABEL) as RiskTier[]).map((t) => (
+                <option key={t} value={t}>
+                  {RISK_TIER_BOX_LABEL[t]}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
             <label>Masa berlaku</label>
-            <select
-              value={validityMonths}
-              onChange={(e) => setValidityMonths(Number(e.target.value))}
-              style={{ padding: "7px 9px", borderRadius: 3, border: "1px solid var(--border-strong)", fontFamily: "inherit", fontSize: 13.5 }}
-            >
+            <select value={validityMonths} onChange={(e) => setValidityMonths(Number(e.target.value))}>
               <option value={6}>6 bulan</option>
               <option value={12}>12 bulan</option>
               <option value={24}>24 bulan</option>
@@ -116,64 +139,43 @@ export default function UploadReviewModal({
         <table className="edit-table">
           <thead>
             <tr>
-              <th style={{ width: "26%" }}>Pemeriksaan</th>
+              <th style={{ width: "16%" }}>Kategori</th>
+              <th style={{ width: "20%" }}>Pemeriksaan</th>
               <th style={{ width: "14%" }}>Hasil</th>
-              <th style={{ width: "12%" }}>Satuan</th>
-              <th style={{ width: "12%" }}>Rujukan min</th>
-              <th style={{ width: "12%" }}>Rujukan maks</th>
-              <th style={{ width: "16%" }}>Status</th>
+              <th style={{ width: "10%" }}>Satuan</th>
+              <th style={{ width: "16%" }}>Rujukan</th>
+              <th style={{ width: "12%" }}>Tingkat</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
-              return (
-                <tr key={r.id}>
-                  <td>
-                    <input type="text" value={r.name} onChange={(e) => updateRow(r.id, "name", e.target.value)} />
-                  </td>
-                  <td>
-                    <input
-                      className="val-input"
-                      type="text"
-                      value={r.value ?? ""}
-                      onChange={(e) => updateRow(r.id, "value", e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <input type="text" value={r.unit} onChange={(e) => updateRow(r.id, "unit", e.target.value)} />
-                  </td>
-                  <td>
-                    <input
-                      className="val-input"
-                      type="text"
-                      value={r.rangeLow ?? ""}
-                      onChange={(e) => updateRow(r.id, "rangeLow", e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="val-input"
-                      type="text"
-                      value={r.rangeHigh ?? ""}
-                      onChange={(e) => updateRow(r.id, "rangeHigh", e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <select value={r.flagRaw} onChange={(e) => updateRow(r.id, "flagRaw", e.target.value)}>
-                      <option value="">Normal</option>
-                      <option value="H">Tinggi</option>
-                      <option value="L">Rendah</option>
-                    </select>
-                  </td>
-                  <td>
-                    <button className="row-remove" onClick={() => removeRow(r.id)}>
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {computedRows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <input type="text" value={r.category} onChange={(e) => updateRow(r.id, "category", e.target.value)} />
+                </td>
+                <td>
+                  <input type="text" value={r.name} onChange={(e) => updateRow(r.id, "name", e.target.value)} />
+                </td>
+                <td>
+                  <input type="text" value={r.valueText} onChange={(e) => updateRow(r.id, "valueText", e.target.value)} />
+                </td>
+                <td>
+                  <input type="text" value={r.unit} onChange={(e) => updateRow(r.id, "unit", e.target.value)} />
+                </td>
+                <td>
+                  <input type="text" value={r.rangeText} onChange={(e) => updateRow(r.id, "rangeText", e.target.value)} />
+                </td>
+                <td>
+                  <span className={`pill tier-${r.riskTier}`}>{RISK_TIER_BOX_LABEL[r.riskTier]}</span>
+                </td>
+                <td>
+                  <button className="row-remove" onClick={() => removeRow(r.id)}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
         <button className="add-row-btn" onClick={addRow}>

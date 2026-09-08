@@ -1,16 +1,8 @@
 "use client";
 
 import type { Checkup } from "@/lib/types";
-import { FIT_STATUS_LABEL } from "@/lib/types";
-import { formatDate } from "./Timeline";
-
-const statusLabel: Record<string, string> = { normal: "Normal", high: "Tinggi", low: "Rendah" };
-const FIT_CLASS: Record<string, string> = {
-  fit: "fit",
-  fit_catatan: "fit-catatan",
-  tidak_fit_sementara: "tidak-fit-sementara",
-  tidak_fit: "tidak-fit",
-};
+import { RISK_TIER_RESULT_LABEL } from "@/lib/types";
+import LevelKkrCard from "./LevelKkrCard";
 
 export default function DetailPanel({ checkups, selectedId }: { checkups: Checkup[]; selectedId: string | null }) {
   if (!selectedId) {
@@ -18,76 +10,66 @@ export default function DetailPanel({ checkups, selectedId }: { checkups: Checku
       <div className="panel">
         <div className="empty-state">
           <div className="serif">Belum ada data</div>
-          <div>Unggah PDF hasil checkup pertama Anda untuk mulai memantau.</div>
+          <div>Unggah PDF hasil checkup pertama untuk mulai memantau.</div>
         </div>
       </div>
     );
   }
 
-  const idx = checkups.findIndex((c) => c.id === selectedId);
-  const rec = checkups[idx];
+  const rec = checkups.find((c) => c.id === selectedId);
   if (!rec) return <div className="panel" />;
 
-  // checkups terurut desc berdasarkan tanggal — checkup lebih lama ada di index sesudahnya
-  const prevRec = checkups.slice(idx + 1).find((c) => c.date <= rec.date);
-  const prevValues: Record<string, number> = {};
-  if (prevRec) {
-    prevRec.results.forEach((r) => {
-      prevValues[r.name.toLowerCase()] = r.value;
-    });
-  }
+  // Kelompokkan hasil per kategori, urut sesuai kemunculan pertama.
+  const groups: Array<{ category: string; rows: typeof rec.results }> = [];
+  rec.results.forEach((r) => {
+    const cat = r.category || "Lainnya";
+    let g = groups.find((x) => x.category === cat);
+    if (!g) {
+      g = { category: cat, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push(r);
+  });
 
   return (
-    <div className="panel">
-      <h2>{formatDate(rec.date)}</h2>
-      <p className="sub">
-        {rec.source} · <span className={`status-badge ${FIT_CLASS[rec.status]}`}>{FIT_STATUS_LABEL[rec.status]}</span>{" "}
-        · berlaku sampai {formatDate(rec.expiryDate)}
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Pemeriksaan</th>
-            <th className="num">Hasil</th>
-            <th>Satuan</th>
-            <th>Rujukan</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rec.results.map((r) => {
-            const range =
-              r.rangeLow != null && r.rangeHigh != null
-                ? `${r.rangeLow}–${r.rangeHigh}`
-                : r.rangeLow != null
-                ? `>${r.rangeLow}`
-                : r.rangeHigh != null
-                ? `<${r.rangeHigh}`
-                : "—";
-            const prev = prevValues[r.name.toLowerCase()];
-            const trend = prev !== undefined && prev !== r.value ? (r.value > prev ? "↑" : "↓") : null;
-            return (
-              <tr key={r.id}>
-                <td>{r.name}</td>
-                <td className="num">
-                  {r.value}
-                  {trend && (
-                    <span className="trend">
-                      {trend} dari {prev}
-                    </span>
-                  )}
-                </td>
-                <td>{r.unit || "—"}</td>
-                <td>{range}</td>
-                <td>
-                  <span className={`pill ${r.status}`}>{statusLabel[r.status]}</span>
-                  {r.resolved && <span className="trend"> selesai</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <LevelKkrCard checkup={rec} />
+      <div className="panel">
+        <h2>Hasil Pemeriksaan</h2>
+        <p className="sub">{rec.source}</p>
+        {groups.map((g) => (
+          <div key={g.category} className="result-group">
+            <div className="result-group-title">{g.category}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Pemeriksaan</th>
+                  <th>Flag</th>
+                  <th className="num">Hasil</th>
+                  <th>Satuan</th>
+                  <th>Nilai Normal</th>
+                  <th>Tingkat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.rows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.name}</td>
+                    <td>{r.riskTier !== "rendah" ? "!" : ""}</td>
+                    <td className="num">{r.valueText}</td>
+                    <td>{r.unit || "—"}</td>
+                    <td>{r.rangeText || (r.rangeLow != null && r.rangeHigh != null ? `${r.rangeLow}–${r.rangeHigh}` : "—")}</td>
+                    <td>
+                      <span className={`pill tier-${r.riskTier}`}>{RISK_TIER_RESULT_LABEL[r.riskTier]}</span>
+                      {r.resolved && <span className="trend"> selesai</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

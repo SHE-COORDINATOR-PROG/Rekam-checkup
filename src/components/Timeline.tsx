@@ -1,8 +1,9 @@
 "use client";
 
 import type { Checkup } from "@/lib/types";
+import { RISK_TIER_BOX_LABEL } from "@/lib/types";
 
-function formatDate(iso: string) {
+export function formatDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -27,21 +28,21 @@ export default function Timeline({
   return (
     <div className="timeline">
       {checkups.map((c) => {
-        const abnormalCount = c.results.filter((r) => r.status !== "normal" && !r.resolved).length;
         const active = c.id === selectedId;
         return (
           <div
             key={c.id}
-            className={`tl-item ${active ? "active" : ""} ${abnormalCount > 0 ? "has-alert" : ""}`}
+            className={`tl-item ${active ? "active" : ""} tl-tier-${c.kkrLevel}`}
             onClick={() => onSelect(c.id)}
           >
-            <div className="tl-date">{formatDate(c.date)}</div>
-            <div className="tl-sub">{abnormalCount > 0 ? `${abnormalCount} perlu perhatian` : "Semua normal"}</div>
+            <div className="tl-date">{c.patientName || formatDate(c.date)}</div>
+            <div className="tl-sub">
+              {c.patientName ? formatDate(c.date) + " · " : ""}
+              {RISK_TIER_BOX_LABEL[c.kkrLevel]}
+            </div>
           </div>
         );
       })}
     </div>
   );
 }
-
-export { formatDate };

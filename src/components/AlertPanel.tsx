@@ -1,6 +1,7 @@
 "use client";
 
 import type { Checkup } from "@/lib/types";
+import { RISK_TIER_RESULT_LABEL } from "@/lib/types";
 import { formatDate } from "./Timeline";
 
 export default function AlertPanel({
@@ -13,8 +14,8 @@ export default function AlertPanel({
   const items = checkups
     .flatMap((c) =>
       c.results
-        .filter((r) => r.status !== "normal" && !r.resolved)
-        .map((r) => ({ ...r, date: c.date }))
+        .filter((r) => r.riskTier !== "rendah" && !r.resolved)
+        .map((r) => ({ ...r, date: c.date, patientName: c.patientName }))
     )
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -28,10 +29,13 @@ export default function AlertPanel({
         <div className="alert-row" key={it.id}>
           <div>
             <div className="name">
-              {it.name} <span className={`pill ${it.status}`}>{it.status === "high" ? "Tinggi" : "Rendah"}</span>
+              {it.name} <span className={`pill tier-${it.riskTier}`}>{RISK_TIER_RESULT_LABEL[it.riskTier]}</span>
             </div>
             <div className="note">{it.note}</div>
-            <div className="meta">{formatDate(it.date)}</div>
+            <div className="meta">
+              {it.patientName ? `${it.patientName} · ` : ""}
+              {formatDate(it.date)}
+            </div>
           </div>
           <button className="resolve-btn" onClick={() => onResolve(it.id)}>
             Tandai selesai

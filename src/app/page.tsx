@@ -2,33 +2,33 @@
 
 import { useMemo, useState } from "react";
 import { useCheckups } from "@/lib/useCheckups";
-import type { FitStatus } from "@/lib/types";
-import { FIT_STATUS_LABEL } from "@/lib/types";
+import type { RiskTier } from "@/lib/types";
+import { RISK_TIER_BOX_LABEL } from "@/lib/types";
 import { daysUntil } from "@/lib/parse";
-import { filterCheckups, countUnresolvedFollowUps, countExpiringSoon, statusDistribution, abnormalTrend, topAbnormalTests } from "@/lib/stats";
+import { filterCheckups, countUnresolvedFollowUps, countExpiringSoon, kkrDistribution, abnormalTrend, topAbnormalTests } from "@/lib/stats";
 import { formatDate } from "@/components/Timeline";
 import AppShell from "@/components/AppShell";
 import StatCard from "@/components/StatCard";
 import FilterBar from "@/components/FilterBar";
 import TrendChart from "@/components/charts/TrendChart";
-import StatusDistributionChart from "@/components/charts/StatusDistributionChart";
+import KkrDistributionChart from "@/components/charts/KkrDistributionChart";
 import TopAbnormalChart from "@/components/charts/TopAbnormalChart";
 
 export default function DashboardPage() {
   const { checkups, loading, lastUpdated, fetchCheckups, saveCheckup } = useCheckups();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [status, setStatus] = useState<FitStatus | "all">("all");
+  const [kkrLevel, setKkrLevel] = useState<RiskTier | "all">("all");
 
-  const filtered = useMemo(() => filterCheckups(checkups, { from, to, status }), [checkups, from, to, status]);
+  const filtered = useMemo(() => filterCheckups(checkups, { from, to, kkrLevel }), [checkups, from, to, kkrLevel]);
 
   const unresolvedCount = useMemo(() => countUnresolvedFollowUps(filtered), [filtered]);
   const expiring = useMemo(() => countExpiringSoon(checkups), [checkups]); // masa berlaku selalu dari data penuh, bukan hasil filter
-  const distribution = useMemo(() => statusDistribution(filtered), [filtered]);
+  const distribution = useMemo(() => kkrDistribution(filtered), [filtered]);
   const trend = useMemo(() => abnormalTrend(filtered), [filtered]);
   const topAbnormal = useMemo(() => topAbnormalTests(filtered), [filtered]);
 
-  const latestStatus = checkups[0]?.status;
+  const latestLevel = checkups[0]?.kkrLevel;
 
   return (
     <AppShell
@@ -43,14 +43,15 @@ export default function DashboardPage() {
         <div className="empty-state">Memuat...</div>
       ) : (
         <>
-          <FilterBar from={from} to={to} status={status} onFromChange={setFrom} onToChange={setTo} onStatusChange={setStatus} />
+          <FilterBar from={from} to={to} kkrLevel={kkrLevel} onFromChange={setFrom} onToChange={setTo} onKkrLevelChange={setKkrLevel} />
 
           <div className="stat-grid">
             <StatCard label="Total checkup" value={filtered.length} sub={`dari ${checkups.length} total tersimpan`} />
             <StatCard
-              label="Status kelayakan terkini"
-              value={latestStatus ? FIT_STATUS_LABEL[latestStatus] : "—"}
-              sub={checkups[0] ? `Checkup ${formatDate(checkups[0].date)}` : undefined}
+              label="Level KKR terkini"
+              value={latestLevel ? RISK_TIER_BOX_LABEL[latestLevel] : "—"}
+              sub={checkups[0] ? `${checkups[0].patientName} · ${formatDate(checkups[0].date)}` : undefined}
+              alert={latestLevel === "berat"}
             />
             <StatCard label="Perlu ditindaklanjuti" value={unresolvedCount} sub="hasil di luar rentang normal" alert={unresolvedCount > 0} />
             <StatCard
@@ -67,8 +68,8 @@ export default function DashboardPage() {
               <TrendChart data={trend} />
             </div>
             <div className="chart-panel">
-              <h3>Distribusi status kelayakan</h3>
-              <StatusDistributionChart data={distribution} />
+              <h3>Distribusi Level KKR</h3>
+              <KkrDistributionChart data={distribution} />
             </div>
           </div>
 
@@ -88,10 +89,10 @@ export default function DashboardPage() {
                     return (
                       <div className="expiry-row" key={c.id}>
                         <div>
-                          <div className="name">Checkup {formatDate(c.date)}</div>
+                          <div className="name">{c.patientName || `Checkup ${formatDate(c.date)}`}</div>
                           <div className="meta">Berlaku sampai {formatDate(c.expiryDate)}</div>
                         </div>
-                        <span className={`pill ${days < 0 ? "high" : "low"}`}>
+                        <span className={`pill tier-${days < 0 ? "berat" : "sedang"}`}>
                           {days < 0 ? `Lewat ${Math.abs(days)} hari` : `${days} hari lagi`}
                         </span>
                       </div>

@@ -22,6 +22,10 @@ bukan aplikasi multi-user.
    ```
    Simpan ini — akan dipakai sebagai `DATABASE_URL` di Vercel.
 
+   **Jika database Anda sudah pernah dibuat dari versi aplikasi sebelumnya**, jalankan
+   juga `migration_2_status_validity.sql` lalu `migration_3_kkr_dan_pasien.sql` secara
+   berurutan di SQL Editor (aman dijalankan berkali-kali).
+
 ## 2. Unggah kode ke GitHub
 
 Proyek ini sudah disiapkan sebagai git repository lokal (`git init` + commit
@@ -60,13 +64,28 @@ ulang.
 
 ## Struktur halaman
 
-- **Dashboard** (`/`) — ringkasan: filter tanggal & status, kartu statistik (total checkup,
-  status kelayakan terkini, jumlah perlu ditindaklanjuti, checkup yang akan kadaluarsa),
-  grafik tren hasil abnormal, distribusi status kelayakan, dan pemeriksaan yang paling
+- **Dashboard** (`/`) — ringkasan: filter tanggal & Level KKR, kartu statistik (total checkup,
+  Level KKR terkini, jumlah perlu ditindaklanjuti, checkup yang akan kadaluarsa),
+  grafik tren hasil abnormal, distribusi Level KKR, dan pemeriksaan yang paling
   sering abnormal.
-- **Riwayat Checkup** (`/riwayat`) — daftar checkup dalam garis waktu, panel follow-up,
-  dan detail hasil per checkup (versi sebelumnya).
+- **Riwayat Checkup** (`/riwayat`) — pencarian nama pasien/karyawan, daftar checkup dalam
+  garis waktu, panel follow-up, dan detail hasil per checkup dengan tabel dikelompokkan
+  per kategori pemeriksaan (Hematologi, Kimia Klinik, Urine, dst) serta kartu ringkasan
+  "Level KKR Anda" meniru format laporan klinik.
 - Tombol **"+ Unggah Checkup"** di sidebar tersedia di semua halaman.
+
+## Tentang Level KKR (Rendah / Sedang / Berat)
+
+Setiap hasil pemeriksaan diberi tingkat risiko otomatis berdasarkan seberapa jauh
+nilainya menyimpang dari rentang rujukan (untuk hasil numerik) atau kata kunci
+Positif/Reaktif (untuk hasil kualitatif seperti urine/imunoserologi). Level KKR
+keseluruhan checkup mengikuti tingkat risiko terburuk di antara semua indikator —
+sama seperti pola pada laporan "LEVEL KKR ANDA" dari klinik.
+
+**Penting:** ini adalah perkiraan otomatis berdasarkan pola umum, BUKAN replikasi
+persis algoritma penilaian resmi klinik (yang tidak diketahui rincinya). Level KKR
+hasil parsing otomatis selalu bisa diubah manual saat meninjau upload agar sesuai
+dengan kesimpulan resmi di laporan asli.
 
 ## 4. Menjalankan secara lokal (opsional)
 
