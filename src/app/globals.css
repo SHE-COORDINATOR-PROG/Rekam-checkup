@@ -161,6 +161,14 @@ h1, h2, h3, .serif { font-family: 'Source Serif 4', Georgia, serif; }
 .kkr-conclusion-value.tier-sedang { color: var(--amber); }
 .kkr-conclusion-value.tier-berat { color: var(--critical); }
 
+.kkr-followup { margin-top: 18px; padding: 14px 16px; border-radius: 3px; border-left: 3px solid var(--amber); background: var(--amber-bg); }
+.kkr-followup-berat { border-left-color: var(--critical); background: var(--critical-bg); }
+.kkr-followup-title { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; }
+.kkr-followup-list { margin: 0 0 10px; padding-left: 18px; }
+.kkr-followup-list li { font-size: 13px; line-height: 1.6; }
+.kkr-followup-name { font-weight: 600; }
+.kkr-followup-action { font-size: 13px; line-height: 1.5; }
+
 .result-group { margin-top: 18px; }
 .result-group:first-of-type { margin-top: 6px; }
 .result-group-title { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border-strong); }

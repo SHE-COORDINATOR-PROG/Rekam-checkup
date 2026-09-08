@@ -66,6 +66,7 @@ export function useCheckups() {
           rangeLow: r.rangeLow,
           rangeHigh: r.rangeHigh,
           rangeText: r.rangeText,
+          flagRaw: r.flagRaw,
         })),
       }),
     });

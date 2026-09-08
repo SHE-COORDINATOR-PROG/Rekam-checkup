@@ -40,7 +40,7 @@ export default function UploadReviewModal({
       rows.map((r) => {
         const { rangeLow, rangeHigh } = r.rangeText ? parseRangeText(r.rangeText) : { rangeLow: r.rangeLow, rangeHigh: r.rangeHigh };
         const value = r.valueText ? toNum(r.valueText) : r.value;
-        const riskTier = computeRiskTier({ value, rangeLow, rangeHigh, valueText: r.valueText, rangeText: r.rangeText });
+        const riskTier = computeRiskTier({ value, rangeLow, rangeHigh, valueText: r.valueText, rangeText: r.rangeText, flagRaw: r.flagRaw });
         return { ...r, value, rangeLow, rangeHigh, riskTier };
       }),
     [rows]
@@ -141,9 +141,12 @@ export default function UploadReviewModal({
             <tr>
               <th style={{ width: "16%" }}>Kategori</th>
               <th style={{ width: "20%" }}>Pemeriksaan</th>
-              <th style={{ width: "14%" }}>Hasil</th>
-              <th style={{ width: "10%" }}>Satuan</th>
-              <th style={{ width: "16%" }}>Rujukan</th>
+              <th style={{ width: "12%" }}>Hasil</th>
+              <th style={{ width: "8%" }}>Satuan</th>
+              <th style={{ width: "14%" }}>Rujukan</th>
+              <th style={{ width: "6%" }} title="Tanda +/* dari kolom FLAG di laporan asli — biasanya dicetak merah untuk menandai hasil tidak normal">
+                Flag
+              </th>
               <th style={{ width: "12%" }}>Tingkat</th>
               <th></th>
             </tr>
@@ -165,6 +168,16 @@ export default function UploadReviewModal({
                 </td>
                 <td>
                   <input type="text" value={r.rangeText} onChange={(e) => updateRow(r.id, "rangeText", e.target.value)} />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    value={r.flagRaw}
+                    maxLength={1}
+                    style={{ textAlign: "center" }}
+                    placeholder="—"
+                    onChange={(e) => updateRow(r.id, "flagRaw", e.target.value)}
+                  />
                 </td>
                 <td>
                   <span className={`pill tier-${r.riskTier}`}>{RISK_TIER_BOX_LABEL[r.riskTier]}</span>

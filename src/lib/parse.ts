@@ -293,28 +293,41 @@ export function computeRiskTier(row: {
   rangeHigh: number | null;
   valueText: string;
   rangeText: string;
+  flagRaw?: string;
 }): RiskTier {
+  const flagged = !!(row.flagRaw && row.flagRaw.trim());
+
+  let tier: RiskTier;
   if (row.value === null) {
     const v = (row.valueText || "").toLowerCase();
     const isAbnormalQual = /positif|reaktif/.test(v) && !/non\s*reaktif/.test(v);
-    if (!isAbnormalQual) return "rendah";
-    const gradeMatch = v.match(/(\d+)/);
-    const grade = gradeMatch ? parseInt(gradeMatch[1], 10) : 1;
-    return grade >= 3 ? "berat" : "sedang";
+    if (!isAbnormalQual) {
+      tier = "rendah";
+    } else {
+      const gradeMatch = v.match(/(\d+)/);
+      const grade = gradeMatch ? parseInt(gradeMatch[1], 10) : 1;
+      tier = grade >= 3 ? "berat" : "sedang";
+    }
+  } else if (row.rangeLow === null && row.rangeHigh === null) {
+    tier = "rendah";
+  } else {
+    let overBy = 0;
+    if (row.rangeHigh !== null && row.value > row.rangeHigh) {
+      const span = row.rangeHigh - (row.rangeLow ?? 0) || row.rangeHigh || 1;
+      overBy = (row.value - row.rangeHigh) / span;
+    } else if (row.rangeLow !== null && row.value < row.rangeLow) {
+      const span = (row.rangeHigh ?? row.rangeLow * 2) - row.rangeLow || row.rangeLow || 1;
+      overBy = (row.rangeLow - row.value) / span;
+    }
+    tier = overBy <= 0 ? "rendah" : overBy > 0.5 ? "berat" : "sedang";
   }
 
-  if (row.rangeLow === null && row.rangeHigh === null) return "rendah";
-
-  let overBy = 0;
-  if (row.rangeHigh !== null && row.value > row.rangeHigh) {
-    const span = row.rangeHigh - (row.rangeLow ?? 0) || row.rangeHigh || 1;
-    overBy = (row.value - row.rangeHigh) / span;
-  } else if (row.rangeLow !== null && row.value < row.rangeLow) {
-    const span = (row.rangeHigh ?? row.rangeLow * 2) - row.rangeLow || row.rangeLow || 1;
-    overBy = (row.rangeLow - row.value) / span;
-  }
-  if (overBy <= 0) return "rendah";
-  return overBy > 0.5 ? "berat" : "sedang";
+  // Kolom FLAG ("+"/"*") pada laporan asli selalu dicetak MERAH untuk menandai
+  // hasil di luar rentang normal. Kalau baris ini berflag tapi tebakan
+  // rentang/angka di atas keliru menyimpulkan "rendah", jangan pernah
+  // menurunkan status merah itu jadi normal — minimal naikkan ke "sedang".
+  if (flagged && tier === "rendah") return "sedang";
+  return tier;
 }
 
 /** Level KKR keseluruhan = tingkat risiko terburuk di antara semua indikator. */
@@ -324,11 +337,12 @@ export function suggestKkrLevel(rows: Array<{ riskTier: RiskTier }>): RiskTier {
   return "rendah";
 }
 
-/** Format ringkas untuk daftar follow-up, mis. "135 mg/dL (rujukan 70-100)". */
+/** Format ringkas untuk daftar follow-up, mis. "135 mg/dL (rujukan 70-100) — perlu tindak lanjut / follow up segera". */
 export function followUpNote(row: { valueText: string; unit: string; rangeText: string }, tier: RiskTier): string {
   if (tier === "rendah") return "";
   const valTxt = `${row.valueText}${row.unit ? " " + row.unit : ""}`;
-  return row.rangeText ? `${valTxt} (rujukan ${row.rangeText})` : valTxt;
+  const base = row.rangeText ? `${valTxt} (rujukan ${row.rangeText})` : valTxt;
+  return tier === "berat" ? `${base} — perlu tindak lanjut / follow up segera` : base;
 }
 
 /** Menambah sejumlah bulan ke tanggal ISO (yyyy-mm-dd), dipakai untuk menghitung masa berlaku checkup. */

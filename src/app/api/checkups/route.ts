@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
       rangeLow: number | null;
       rangeHigh: number | null;
       rangeText: string;
+      flagRaw?: string;
     }> = body.results || [];
 
     if (!date || rows.length === 0) {

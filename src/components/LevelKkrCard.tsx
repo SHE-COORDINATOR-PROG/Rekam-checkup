@@ -1,7 +1,7 @@
 "use client";
 
 import type { Checkup, RiskTier } from "@/lib/types";
-import { RISK_TIER_BOX_LABEL } from "@/lib/types";
+import { RISK_TIER_BOX_LABEL, RISK_TIER_RESULT_LABEL } from "@/lib/types";
 import { daysUntil } from "@/lib/parse";
 import { formatDate } from "./Timeline";
 
@@ -70,6 +70,40 @@ export default function LevelKkrCard({ checkup }: { checkup: Checkup }) {
         {days < 0
           ? `Masa berlaku sudah lewat sejak ${formatDate(checkup.expiryDate)}`
           : `Berlaku sampai ${formatDate(checkup.expiryDate)} (${days} hari lagi)`}
+      </div>
+
+      {checkup.kkrLevel !== "rendah" && <KkrFollowUp checkup={checkup} />}
+    </div>
+  );
+}
+
+/**
+ * Ditampilkan hanya bila Level KKR "Sedang" atau "Berat": daftar temuan
+ * (hasil yang tidak normal) dan pesan wajib follow up, meniru bunyi
+ * instruksi pada laporan "LEVEL KKR ANDA" dari klinik.
+ */
+function KkrFollowUp({ checkup }: { checkup: Checkup }) {
+  const temuan = checkup.results.filter((r) => r.riskTier !== "rendah");
+  const isBerat = checkup.kkrLevel === "berat";
+
+  return (
+    <div className={`kkr-followup ${isBerat ? "kkr-followup-berat" : "kkr-followup-sedang"}`}>
+      <div className="kkr-followup-title">Temuan yang perlu ditindaklanjuti</div>
+      {temuan.length > 0 && (
+        <ul className="kkr-followup-list">
+          {temuan.map((r) => (
+            <li key={r.id}>
+              <span className="kkr-followup-name">{r.name}</span>
+              {r.note ? `: ${r.note}` : ""}
+              <span className={`pill tier-${r.riskTier}`}> {RISK_TIER_RESULT_LABEL[r.riskTier]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="kkr-followup-action">
+        {isBerat
+          ? <>Level KKR Anda <strong>&ldquo;BERAT&rdquo;</strong> — segera lakukan <strong>Follow Up MCU</strong> ke klinik agar Level KKR Anda dinyatakan <strong>CLOSED</strong> di sistem INCA.</>
+          : <>Level KKR Anda <strong>&ldquo;SEDANG&rdquo;</strong> — disarankan melakukan <strong>Follow Up MCU</strong> ke klinik agar Level KKR Anda dinyatakan <strong>CLOSED</strong> di sistem INCA.</>}
       </div>
     </div>
   );
