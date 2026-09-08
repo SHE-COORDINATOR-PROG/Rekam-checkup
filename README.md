@@ -58,6 +58,16 @@ CLI: `gh repo create rekam-checkup --private --source=. --push`.
 Setiap kali Anda `git push` ke branch `main`, Vercel otomatis build & deploy
 ulang.
 
+## Struktur halaman
+
+- **Dashboard** (`/`) — ringkasan: filter tanggal & status, kartu statistik (total checkup,
+  status kelayakan terkini, jumlah perlu ditindaklanjuti, checkup yang akan kadaluarsa),
+  grafik tren hasil abnormal, distribusi status kelayakan, dan pemeriksaan yang paling
+  sering abnormal.
+- **Riwayat Checkup** (`/riwayat`) — daftar checkup dalam garis waktu, panel follow-up,
+  dan detail hasil per checkup (versi sebelumnya).
+- Tombol **"+ Unggah Checkup"** di sidebar tersedia di semua halaman.
+
 ## 4. Menjalankan secara lokal (opsional)
 
 ```bash
