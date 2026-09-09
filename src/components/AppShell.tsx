@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { DraftRow, PatientInfo } from "@/lib/types";
-import { parseLines, extractPatientInfo } from "@/lib/parse";
+import { parseLines, extractPatientInfo, extractKkrConclusion } from "@/lib/parse";
+import type { KkrConclusion } from "@/lib/parse";
 import { extractPdfLines } from "@/lib/pdf-extract";
 import type { SaveCheckupInput } from "@/lib/useCheckups";
 import UploadReviewModal from "./UploadReviewModal";
@@ -31,6 +32,7 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
     patientInfo: PatientInfo;
     source: string;
     parseNote: string;
+    officialKkr: KkrConclusion | null;
   } | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -42,20 +44,26 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
       const lines = await extractPdfLines(file);
       const rows = parseLines(lines);
       const patientInfo = extractPatientInfo(lines);
+      const officialKkr = extractKkrConclusion(lines);
+      const kkrNote = officialKkr
+        ? ` Kesimpulan resmi terbaca dari halaman "LEVEL KKR ANDA": Level KKR ${officialKkr.level.toUpperCase()} (${officialKkr.rendah} rendah / ${officialKkr.sedang} sedang / ${officialKkr.berat} berat) — dipakai sebagai Level KKR default di bawah.`
+        : "";
       setModal({
         rows,
         patientInfo,
         source: file.name,
+        officialKkr,
         parseNote:
-          rows.length > 0
-            ? `${rows.length} baris hasil terdeteksi otomatis. Periksa nilai, rujukan, dan data pasien di bawah sebelum menyimpan — baris kualitatif (Positif/Negatif) paling sering butuh koreksi.`
-            : `Tidak ada baris yang terbaca otomatis dari file ini. Tambahkan hasil secara manual di bawah.`,
+          (rows.length > 0
+            ? `${rows.length} baris hasil terdeteksi otomatis dari tabel hasil lab. Periksa nilai, rujukan, dan data pasien di bawah sebelum menyimpan — baris kualitatif (Positif/Negatif) paling sering butuh koreksi.`
+            : `Tidak ada baris yang terbaca otomatis dari tabel hasil lab pada file ini. Tambahkan hasil secara manual di bawah.`) + kkrNote,
       });
     } catch {
       setModal({
         rows: [],
         patientInfo: { patientName: "", employeeId: "", position: "", department: "", company: "", date: new Date().toISOString().slice(0, 10) },
         source: file.name,
+        officialKkr: null,
         parseNote: `Gagal membaca PDF ini secara otomatis. Tambahkan hasil secara manual di bawah.`,
       });
     } finally {
@@ -152,6 +160,7 @@ export default function AppShell({ title, subtitle, lastUpdated, onRefresh, onSa
           initialPatientInfo={modal.patientInfo}
           source={modal.source}
           parseNote={modal.parseNote}
+          officialKkr={modal.officialKkr}
           saving={saving}
           onCancel={() => setModal(null)}
           onSave={handleSave}

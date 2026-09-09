@@ -1,5 +1,11 @@
 import type { DraftRow, PatientInfo, RiskTier } from "./types";
 
+// Penanda batas halaman yang disisipkan oleh pdf-extract.ts di antara halaman
+// PDF, supaya parseLines() bisa mereset "section" pembacaan setiap ganti
+// halaman (mis. berhenti membaca baris tabel hasil lab begitu masuk ke
+// halaman lain seperti resume/kuesioner/KKR).
+export const PAGE_BREAK_MARKER = "\u0000PAGE_BREAK\u0000";
+
 export function toNum(s: string | null | undefined): number | null {
   if (s === undefined || s === null || s === "") return null;
   const direct = parseFloat(s.replace(",", "."));
@@ -14,6 +20,13 @@ export function toNum(s: string | null | undefined): number | null {
 
 const HEADER_SKIP_RE =
   /^(pemeriksaan|flag|hasil|satuan|nilai\s*normal|kualitas\s*adalah\s*prioritas|h30-?pro\s*autoanalyzer)\b/i;
+
+// Baris header kolom tabel hasil lab yang sesungguhnya, mis.
+// "PEMERIKSAAN FLAG HASIL SATUAN NILAI NORMAL". Laporan MCU lengkap ("Buku
+// Hasil MCU") berisi banyak halaman lain (resume, kuesioner, KKR, DASS-21,
+// dst) yang formatnya berbeda dan TIDAK boleh ikut dibaca sebagai baris hasil
+// lab — baris header inilah satu-satunya penanda "mulai baca" yang dipakai.
+const LAB_TABLE_HEADER_RE = /^pemeriksaan\b.*\bflag\b.*\bhasil\b/i;
 
 function isHeaderLine(line: string): boolean {
   if (line.includes(":")) return false;
@@ -53,10 +66,26 @@ export function parseLines(lines: string[]): DraftRow[] {
   const rows: DraftRow[] = [];
   let topCategory = "";
   let subCategory = "";
+  // Hanya baris di dalam tabel hasil lab asli (antara header "PEMERIKSAAN
+  // FLAG HASIL SATUAN NILAI NORMAL" dan akhir halaman) yang boleh diproses.
+  // Direset setiap ganti halaman supaya halaman non-lab (resume, kuesioner,
+  // KKR, DASS-21, dst) tidak pernah ikut menghasilkan baris palsu.
+  let inLabTable = false;
 
   for (const rawLine of lines) {
+    if (rawLine === PAGE_BREAK_MARKER) {
+      inLabTable = false;
+      continue;
+    }
+
     const line = rawLine.trim();
     if (line.length < 2) continue;
+
+    if (LAB_TABLE_HEADER_RE.test(line)) {
+      inLabTable = true;
+      continue;
+    }
+    if (!inLabTable) continue;
 
     if (isHeaderLine(line)) {
       if (isAllCaps(line)) {
@@ -198,7 +227,7 @@ function extractField(fullText: string, label: string, stopLabels: string[]): st
 
 /** Menebak identitas pasien/karyawan dan tanggal MCU dari teks header laporan. */
 export function extractPatientInfo(lines: string[]): PatientInfo {
-  const fullText = lines.join("   ");
+  const fullText = lines.filter((l) => l !== PAGE_BREAK_MARKER).join("   ");
 
   const nameFromFull = extractField(fullText, "Nama Lengkap", PATIENT_LABELS) || extractField(fullText, "Nama", PATIENT_LABELS);
 
@@ -358,4 +387,48 @@ export function daysUntil(dateIso: string): number {
   today.setHours(0, 0, 0, 0);
   const target = new Date(dateIso + "T00:00:00");
   return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+// ---------------------------------------------------------------------------
+// Kesimpulan resmi "LEVEL KKR ANDA" (kalau ada di PDF, mis. dokumen "Buku
+// Hasil MCU" lengkap dari klinik)
+// ---------------------------------------------------------------------------
+
+export type KkrConclusion = {
+  rendah: number;
+  sedang: number;
+  berat: number;
+  level: RiskTier;
+};
+
+/**
+ * Membaca kesimpulan RESMI dari halaman "LEVEL KKR ANDA" milik klinik —
+ * "JML INDIKATOR KKR RENDAH/SEDANG/BERAT" beserta kesimpulan akhirnya
+ * (mis. `LEVEL KKR Anda "BERAT"`). Level KKR ini dihitung klinik dari 41
+ * parameter (termasuk kuesioner, fisik, EKG, dll) yang jauh lebih lengkap
+ * daripada baris hasil lab yang berhasil diparsing aplikasi ini — jadi kalau
+ * halaman ini ditemukan, kesimpulannya HARUS dipakai apa adanya, bukan
+ * ditimpa oleh tebakan `suggestKkrLevel()` dari baris lab saja. Halaman lain
+ * seperti "RESUME HASIL MEDICAL CHECK UP" berisi ringkasan naratif yang
+ * kadang keliru (mis. menyebut nilai yang sebenarnya masih normal sebagai
+ * "meningkat") — TIDAK dipakai di sini, hanya kotak & kesimpulan resmi ini.
+ */
+export function extractKkrConclusion(lines: string[]): KkrConclusion | null {
+  const fullText = lines.filter((l) => l !== PAGE_BREAK_MARKER).join("   ");
+
+  const countsMatch = fullText.match(
+    /JML\s*INDIKATOR\s*KKR\s*RENDAH.*?JML\s*INDIKATOR\s*KKR\s*SEDANG.*?JML\s*INDIKATOR\s*KKR\s*BERAT\D*(\d+)\D+?(\d+)\D+?(\d+)/i
+  );
+  const levelMatch = fullText.match(/LEVEL\s*KKR\s*Anda\s*[""'“”]*\s*(RENDAH|SEDANG|BERAT)/i);
+
+  if (!countsMatch && !levelMatch) return null;
+
+  const level: RiskTier = levelMatch ? (levelMatch[1].toLowerCase() as RiskTier) : "rendah";
+
+  return {
+    rendah: countsMatch ? parseInt(countsMatch[1], 10) : 0,
+    sedang: countsMatch ? parseInt(countsMatch[2], 10) : 0,
+    berat: countsMatch ? parseInt(countsMatch[3], 10) : 0,
+    level,
+  };
 }

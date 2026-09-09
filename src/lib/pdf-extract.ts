@@ -2,6 +2,8 @@
 // memilih file). pdfjs-dist di-import secara dinamis supaya tidak ikut ke bundle
 // server / SSR.
 
+import { PAGE_BREAK_MARKER } from "./parse";
+
 const PDFJS_VERSION = "3.11.174";
 const WORKER_URL = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
 
@@ -26,6 +28,7 @@ export async function extractPdfLines(file: File): Promise<string[]> {
       .map(Number)
       .sort((a, b) => b - a);
     ys.forEach((y) => lines.push(byY[y].join(" ").replace(/\s+/g, " ").trim()));
+    lines.push(PAGE_BREAK_MARKER);
   }
   return lines.filter((l) => l.length > 0);
 }

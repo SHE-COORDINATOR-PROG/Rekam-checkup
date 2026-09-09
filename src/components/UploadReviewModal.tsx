@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { DraftRow, PatientInfo, RiskTier } from "@/lib/types";
 import { RISK_TIER_BOX_LABEL } from "@/lib/types";
 import { computeRiskTier, parseRangeText, suggestKkrLevel, toNum } from "@/lib/parse";
+import type { KkrConclusion } from "@/lib/parse";
 import type { SaveCheckupInput } from "@/lib/useCheckups";
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
   initialPatientInfo: PatientInfo;
   source: string;
   parseNote: string;
+  officialKkr: KkrConclusion | null;
   saving: boolean;
   onCancel: () => void;
   onSave: (input: Omit<SaveCheckupInput, "source">) => void;
@@ -21,6 +23,7 @@ export default function UploadReviewModal({
   initialPatientInfo,
   source,
   parseNote,
+  officialKkr,
   saving,
   onCancel,
   onSave,
@@ -33,7 +36,7 @@ export default function UploadReviewModal({
   const [company, setCompany] = useState(initialPatientInfo.company);
   const [rows, setRows] = useState<DraftRow[]>(initialRows);
   const [validityMonths, setValidityMonths] = useState(12);
-  const [kkrOverride, setKkrOverride] = useState<RiskTier | null>(null);
+  const [kkrOverride, setKkrOverride] = useState<RiskTier | null>(officialKkr?.level ?? null);
 
   const computedRows = useMemo(
     () =>
@@ -45,7 +48,11 @@ export default function UploadReviewModal({
       }),
     [rows]
   );
-  const suggestedKkr = suggestKkrLevel(computedRows);
+  // Kalau halaman "LEVEL KKR ANDA" resmi terbaca dari PDF, pakai kesimpulan
+  // itu apa adanya (lebih lengkap & akurat — dihitung klinik dari 41
+  // parameter). Kalau tidak ada, baru pakai tebakan dari baris lab yang
+  // berhasil diparsing.
+  const suggestedKkr = officialKkr?.level ?? suggestKkrLevel(computedRows);
   const kkrLevel = kkrOverride ?? suggestedKkr;
 
   function updateRow(id: string, field: keyof DraftRow, value: string) {
@@ -121,6 +128,12 @@ export default function UploadReviewModal({
                 </option>
               ))}
             </select>
+            {officialKkr && (
+              <div className="field-hint">
+                Dibaca dari halaman &ldquo;LEVEL KKR ANDA&rdquo;: {officialKkr.rendah} rendah / {officialKkr.sedang} sedang /{" "}
+                {officialKkr.berat} berat.
+              </div>
+            )}
           </div>
           <div className="field">
             <label>Masa berlaku</label>
